@@ -280,6 +280,9 @@ export class TwoHandChecker {
         this.indexedHitObjects.forEach(o => {
             if (!beatmaps[o.cursorIndex]) {
                 const map: Beatmap = Utils.deepCopy(this.map.map);
+
+                map.objects.length = 0;
+
                 beatmaps[o.cursorIndex] = map;
             }
 
@@ -296,8 +299,8 @@ export class TwoHandChecker {
             const starRating: DroidStarRating = Utils.deepCopy(this.map);
             starRating.map = beatmap;
             starRating.generateDifficultyHitObjects(modes.droid);
-            starRating.objects[0].deltaTime = starRating.objects[0].object.startTime - this.indexedHitObjects[0].object.object.startTime;
-            starRating.objects[0].strainTime = Math.max(50, starRating.objects[0].deltaTime);
+            starRating.objects[0].deltaTime = starRating.objects[0].startTime - this.indexedHitObjects[0].object.startTime;
+            starRating.objects[0].strainTime = Math.max(25, starRating.objects[0].deltaTime);
             this.map.objects.push(...starRating.objects);
         });
 
