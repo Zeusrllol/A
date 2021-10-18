@@ -1,4 +1,4 @@
-import { deserialize, serialize } from "v8";
+import { cloneDeep } from "lodash";
 
 /**
  * Some utilities, no biggie.
@@ -19,7 +19,7 @@ export abstract class Utils {
      * @param instance The instance to deep copy.
      */
     static deepCopy<T>(instance: T): T {
-        return deserialize(serialize(instance));
+        return cloneDeep(instance);
     }
 
     /**
