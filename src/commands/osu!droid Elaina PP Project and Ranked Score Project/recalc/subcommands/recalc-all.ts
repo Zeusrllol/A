@@ -9,27 +9,28 @@ import { recalcStrings } from "../recalcStrings";
 export const run: Subcommand["run"] = async (client, interaction) => {
     const dbManager: UserBindCollectionManager = DatabaseManager.elainaDb.collections.userBind;
 
-    let calculatedCount: number = 0;
-
     await interaction.editReply({
         content: MessageCreator.createAccept(recalcStrings.fullRecalcInProgress)
     });
 
+    let calculatedCount: number = await dbManager.getRecalcCalculatedPlayerCount();
+
     const uncalculatedCount: number = await dbManager.getRecalcUncalculatedPlayerCount();
+
+    const total: number = calculatedCount + uncalculatedCount;
 
     const message: Message = await interaction.channel!.send({
         content: MessageCreator.createWarn(
-            recalcStrings.fullRecalcTrackProgress, "0", uncalculatedCount.toLocaleString(), "0.00"
+            recalcStrings.fullRecalcTrackProgress,
+            calculatedCount.toLocaleString(),
+            total.toLocaleString(),
+            (calculatedCount * 100 / total).toFixed(2)
         )
     });
 
-    while (true) {
-        const player: UserBind | undefined = (await dbManager.getRecalcUnscannedPlayers(1)).first();
+    let player: UserBind | undefined;
 
-        if (!player) {
-            break;
-        }
-
+    while (player = (await dbManager.getRecalcUnscannedPlayers(1)).first()) {
         client.logger.info(`Now calculating ID ${player.discordid}`);
 
         if (interaction.options.getBoolean("full")) {
@@ -44,8 +45,8 @@ export const run: Subcommand["run"] = async (client, interaction) => {
             content: MessageCreator.createWarn(
                 recalcStrings.fullRecalcTrackProgress,
                 calculatedCount.toLocaleString(),
-                uncalculatedCount.toLocaleString(),
-                (calculatedCount * 100 / uncalculatedCount).toFixed(2)
+                total.toLocaleString(),
+                (calculatedCount * 100 / total).toFixed(2)
             )
         });
     }

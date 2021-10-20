@@ -1,7 +1,6 @@
 import { Canvas, createCanvas, Image, loadImage, NodeCanvasRenderingContext2D } from "canvas";
 import { Player } from "osu-droid";
 import { promises, Stats } from "fs";
-import { Constants } from "@alice-core/Constants";
 import { PPEntry } from "@alice-interfaces/dpp/PPEntry";
 import { DatabaseManager } from "@alice-database/DatabaseManager";
 import { UserBind } from "@alice-database/utils/elainaDb/UserBind";
@@ -334,7 +333,7 @@ export class ProfileCardCreator {
         increaseYOffset();
 
         if (this.bindInfo) {
-            const ppRank: number = await DatabaseManager.elainaDb.collections.userBind.getUserDPPRank(this.bindInfo.pptotal);
+            const ppRank: number = await this.getPlayerPPRank(this.bindInfo);
             this.context.fillText(`Droid pp: ${this.bindInfo.pptotal.toFixed(2)}pp (#${ppRank.toLocaleString()})`, x, y + yOffset);
             increaseYOffset();
 
@@ -436,7 +435,7 @@ export class ProfileCardCreator {
     private async drawAliceCoinsInformation(): Promise<void> {
         this.context.save();
 
-        const coinImage: Image = await loadImage(Constants.aliceCoinImage);
+        const coinImage: Image = await loadImage(`${process.cwd()}/files/images/alicecoin.png`);
 
         this.context.drawImage(coinImage, 15, 255, 50, 50);
 
@@ -468,5 +467,12 @@ export class ProfileCardCreator {
         }
 
         return accSum / weight;
+    }
+
+    /**
+     * Gets the player's dpp rank.
+     */
+    private async getPlayerPPRank(bindInfo: UserBind): Promise<number> {
+        return (await DatabaseManager.elainaDb?.collections.userBind.getUserDPPRank(bindInfo.pptotal)) ?? 0;
     }
 }

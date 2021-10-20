@@ -422,9 +422,9 @@ export class UserBind extends Manager {
                 let score: Score | undefined;
 
                 while (score = scores.shift()) {
-                    const beatmapInfo: MapInfo | null = await BeatmapManager.getBeatmap(score.hash);
+                    const beatmapInfo: MapInfo | null = await BeatmapManager.getBeatmap(score.hash, false).catch(() => null);
 
-                    await HelperFunctions.sleep(0.2);
+                    await HelperFunctions.sleep(0.1);
 
                     if (isDPPRecalc) {
                         this.client.logger.info(`${++calculatedCount}/${scoreCount} scores calculated`);
@@ -438,8 +438,6 @@ export class UserBind extends Manager {
                         const calcResult: PerformanceCalculationResult | null = await BeatmapDifficultyHelper.calculateScorePerformance(score);
 
                         if (calcResult) {
-                            await HelperFunctions.sleep(0.3);
-
                             ++this.playc;
 
                             DPPHelper.insertScore(newList, score, calcResult);

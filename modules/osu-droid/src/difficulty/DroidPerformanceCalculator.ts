@@ -95,7 +95,12 @@ export class DroidPerformanceCalculator extends PerformanceCalculator {
      * Calculates the aggregated rhythm multiplier of the beatmap.
      */
     private calculateAggregatedRhythmMultiplier(): void {
-        const rhythmMultipliers: number[] = this.stars.objects.map(v => v.rhythmMultiplier);
+        // The first object doesn't have any rhythm multiplier, so we begin with the second object
+        const rhythmMultipliers: number[] = this.stars.objects.map(v => v.rhythmMultiplier).slice(1);
+
+        if (rhythmMultipliers.length === 0) {
+            return;
+        }
 
         const maxMultiplier: number = Math.max(...rhythmMultipliers);
 
@@ -211,8 +216,8 @@ export class DroidPerformanceCalculator extends PerformanceCalculator {
         }
 
         const realAccuracy: Accuracy = new Accuracy({
-            nobjects: ncircles,
-            ...this.computedAccuracy
+            ...this.computedAccuracy,
+            n300: this.computedAccuracy.n300 - (this.stars.objects.length - ncircles)
         });
 
         // Lots of arbitrary values from testing.
