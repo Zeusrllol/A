@@ -234,15 +234,14 @@ export abstract class BeatmapDifficultyHelper {
         if (replay) {
             replay.map = star.droid;
             replay.checkFor3Finger();
-            replay.checkFor2Hand();
-            calculationParams.speedPenalty = replay.speedPenalty;
+            calculationParams.tapPenalty = replay.tapPenalty;
         }
 
         const dpp: DroidPerformanceCalculator = new DroidPerformanceCalculator().calculate({
             stars: star.droid,
             combo: calculationParams.combo,
             accPercent: calculationParams.accuracy,
-            speedPenalty: calculationParams.speedPenalty,
+            tapPenalty: calculationParams.tapPenalty,
             stats: calculationParams.customStatistics
         });
 

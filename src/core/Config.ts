@@ -17,24 +17,6 @@ export abstract class Config {
 
     static readonly botOwners: Snowflake[] = ["132783516176875520", "386742340968120321"];
 
-    static readonly questionWeight: number[] = [
-        1 , 14, 11, 1 , 20, 1 , 1 ,
-        6 , 5 , 6 , 4 , 1 , 20, 17,
-        17 , 5 , 1 , 6 , 4 , 10, 17 ,
-        5 , 9 , 4 , 3 , 20, 1 , 4 ,
-        20
-    ];
-
-    static readonly mudaeBan: [Snowflake, number][] = [
-        ["635533001312305152", -1],
-        ["635533688196694016", 1800]
-    ];
-
-    static readonly mudaeImmune: Snowflake[] = [
-        "635533001312305152",
-        "635533688196694016"
-    ];
-
     static readonly verifyPerm: Snowflake[] = [
         "369108742077284353", "595667274707370024"
     ];
