@@ -67,8 +67,8 @@ export class TwoHandChecker {
         this.data = data;
 
         const stats: MapStats = new MapStats({od: this.map.map.od, mods: this.map.mods.filter(m => !ModUtil.speedChangingMods.map(v => v.droidString).includes(m.droidString))}).calculate();
-        
-        this.hitWindow = new DroidHitWindow(<number> stats.od);
+
+        this.hitWindow = new DroidHitWindow(stats.od!);
     }
 
     /**
@@ -123,13 +123,14 @@ export class TwoHandChecker {
     private indexHitObjects(): void {
         const objects: DifficultyHitObject[] = this.map.objects;
         const objectData: ReplayObjectData[] = this.data.hitObjectData;
+        const hitWindowOffset: number = this.getHitWindowOffset();
         const indexes: number[] = [];
 
         for (let i = 0; i < this.map.objects.length; ++i) {
             const current: DifficultyHitObject = objects[i];
             const currentData: ReplayObjectData = objectData[i];
-            const index: number = this.getCursorIndex(current, currentData);
-            
+            const index: number = this.getCursorIndex(current, currentData, hitWindowOffset);
+
             indexes.push(index);
             this.indexedHitObjects.push(new IndexedHitObject(current, index));
         }
@@ -143,7 +144,7 @@ export class TwoHandChecker {
             }
             ++indexCounts[index];
         }
-        
+
         const mainCursorIndex = indexCounts.indexOf(Math.max(...indexCounts));
         const ignoredCursorIndexes: number[] = [];
         for (let i = 0; i < indexCounts.length; ++i) {
@@ -164,13 +165,43 @@ export class TwoHandChecker {
     }
 
     /**
+     * Gets the hit window offset to be applied to `getCursorIndex`.
+     */
+    private getHitWindowOffset(): number {
+        const deltaTimes: number[] = [];
+
+        for (let i = 0; i < this.downMoveCursorInstances.length; ++i) {
+            const c: CursorData = this.downMoveCursorInstances[i];
+
+            for (let j = 0; j < c.size; ++j) {
+                if (c.time[j] < this.map.map.objects[0].startTime - this.hitWindow.hitWindowFor50()) {
+                    continue;
+                }
+
+                if (c.id[j] !== movementType.MOVE) {
+                    continue;
+                }
+
+                const deltaTime = c.time[j] - c.time[j - 1];
+
+                if (deltaTime > 0) {
+                    deltaTimes.push(deltaTime);
+                }
+            }
+        }
+
+        return Math.min(...deltaTimes);
+    }
+
+    /**
      * Gets the cursor index that hits the given object.
      * 
      * @param object The object to check.
      * @param data The replay data of the object.
+     * @param hitWindowOffset The offset for hit window to compensate for replay hit inaccuracies.
      * @returns The cursor index that hits the given object, -1 if the index is not found, the object is a spinner, or the object was missed.
      */
-    private getCursorIndex(object: DifficultyHitObject, data: ReplayObjectData): number {
+    private getCursorIndex(object: DifficultyHitObject, data: ReplayObjectData, hitWindowOffset: number): number {
         if (object.object instanceof Spinner || data.result === hitResult.RESULT_0) {
             return -1;
         }
@@ -188,9 +219,10 @@ export class TwoHandChecker {
                 hitWindowLength = this.hitWindow.hitWindowFor50(isPrecise);
         }
 
-        const hitTime: number = object.object.startTime;
-        const maximumHitTime: number = hitTime + hitWindowLength;
-        const minimumHitTime: number = hitTime - hitWindowLength;
+        const startTime: number = object.object.startTime;
+        const hitTime: number = startTime + data.accuracy;
+        const minimumHitTime: number = startTime - hitWindowLength - hitWindowOffset;
+        const maximumHitTime: number = startTime + hitWindowLength + hitWindowOffset;
 
         const cursorInformations: CursorInformation[] = [];
         for (let i = 0; i < this.downMoveCursorInstances.length; ++i) {
@@ -238,6 +270,8 @@ export class TwoHandChecker {
                         x: c.x[j + 1],
                         y: c.y[j + 1]
                     });
+// i=0 n=66 t=10935 x=277 y=253 press
+// i=1 n=10 t=10996 x=215 y=92 press
 
                     const displacement: Vector2 = nextPosition.subtract(initialPosition);
 
@@ -267,8 +301,8 @@ export class TwoHandChecker {
         }
 
         // Now we look at which cursor is closest to hit time
-        const minHitTimeDiff: number = Math.min(...cursorInformations.map(v => {return v.hitTimeDiff;}));
-        return <number> cursorInformations.find(c => c.hitTimeDiff === minHitTimeDiff)?.cursorIndex;
+        const minHitTimeDiff: number = Math.min(...cursorInformations.map(v => { return v.hitTimeDiff; }));
+        return cursorInformations.find(c => c.hitTimeDiff === minHitTimeDiff)!.cursorIndex;
     }
 
     /**

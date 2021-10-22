@@ -234,6 +234,7 @@ export abstract class BeatmapDifficultyHelper {
         if (replay) {
             replay.map = star.droid;
             replay.checkFor3Finger();
+            replay.checkFor2Hand();
             calculationParams.tapPenalty = replay.tapPenalty;
         }
 
