@@ -15,6 +15,7 @@ import { Beatmap } from "../../beatmap/Beatmap";
 import { Utils } from "../../utils/Utils";
 import { ModUtil } from "../../utils/ModUtil";
 import { ModPrecise } from "../../mods/ModPrecise";
+import { Circle } from "../../beatmap/hitobjects/Circle";
 
 interface CursorInformation {
     readonly cursorIndex: number;
@@ -56,7 +57,7 @@ export class TwoHandChecker {
      * This is used to prevent excessive penalty by splitting the beatmap into
      * those that do not worth any strain.
      */
-    private readonly minCursorIndexCount: number = 5;
+    private readonly minCursorIndexCount: number = 10;
 
     /**
      * @param map The beatmap to analyze.
@@ -207,16 +208,17 @@ export class TwoHandChecker {
         }
 
         const isPrecise: boolean = this.data.convertedMods.some(m => m instanceof ModPrecise);
-        let hitWindowLength: number;
-        switch (data.result) {
-            case hitResult.RESULT_300:
-                hitWindowLength = this.hitWindow.hitWindowFor300(isPrecise);
-                break;
-            case hitResult.RESULT_100:
-                hitWindowLength = this.hitWindow.hitWindowFor100(isPrecise);
-                break;
-            default:
-                hitWindowLength = this.hitWindow.hitWindowFor50(isPrecise);
+        // For sliders, automatically set hit window to be as lenient as possible.
+        let hitWindowLength: number = this.hitWindow.hitWindowFor50(isPrecise);
+        if (object.object instanceof Circle) {
+            switch (data.result) {
+                case hitResult.RESULT_300:
+                    hitWindowLength = this.hitWindow.hitWindowFor300(isPrecise);
+                    break;
+                case hitResult.RESULT_100:
+                    hitWindowLength = this.hitWindow.hitWindowFor100(isPrecise);
+                    break;
+            }
         }
 
         const startTime: number = object.object.startTime;
@@ -270,8 +272,6 @@ export class TwoHandChecker {
                         x: c.x[j + 1],
                         y: c.y[j + 1]
                     });
-// i=0 n=66 t=10935 x=277 y=253 press
-// i=1 n=10 t=10996 x=215 y=92 press
 
                     const displacement: Vector2 = nextPosition.subtract(initialPosition);
 
@@ -300,7 +300,8 @@ export class TwoHandChecker {
             return -1;
         }
 
-        // Now we look at which cursor is closest to hit time
+        // Cursors have been filtered to see which of them is inside the object.
+        // Now we look at which cursor is closest to hit time.
         const minHitTimeDiff: number = Math.min(...cursorInformations.map(v => { return v.hitTimeDiff; }));
         return cursorInformations.find(c => c.hitTimeDiff === minHitTimeDiff)!.cursorIndex;
     }
