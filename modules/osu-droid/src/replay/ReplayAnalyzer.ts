@@ -201,7 +201,7 @@ export class ReplayAnalyzer {
                 n50: rawObject[4].readInt32BE(24),
                 nmiss: rawObject[4].readInt32BE(28)
             });
-            resultObject.isFullCombo = !!(rawObject[4][44]);
+            resultObject.isFullCombo = !!rawObject[4][44];
             resultObject.playerName = rawObject[5];
             resultObject.rawMods = rawObject[6].elements;
             resultObject.convertedMods = this.convertMods(rawObject[6].elements);
