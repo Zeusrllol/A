@@ -23,11 +23,11 @@ export interface CursorInformation {
      * The y coordinates of this cursor instance in osu!pixels.
      */
     y: number[];
-    
+
     /**
      * The hit results of this cursor instance.
      */
-    id: number[];
+    id: movementType[];
 }
 
 /**
