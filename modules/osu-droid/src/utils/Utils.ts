@@ -33,7 +33,7 @@ export abstract class Utils {
 
         if (initialValue !== undefined) {
             for (let i = 0; i < length; ++i) {
-                array.push(cloneDeep(initialValue));
+                array.push(this.deepCopy(initialValue));
             }
         }
 
