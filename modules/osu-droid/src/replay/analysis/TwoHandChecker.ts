@@ -16,10 +16,12 @@ import { Utils } from "../../utils/Utils";
 import { ModUtil } from "../../utils/ModUtil";
 import { ModPrecise } from "../../mods/ModPrecise";
 import { Circle } from "../../beatmap/hitobjects/Circle";
+import { MathUtils } from "../../mathutil/MathUtils";
+import { CursorOccurrence } from "../data/CursorOccurrence";
 
 interface CursorInformation {
     readonly cursorIndex: number;
-    readonly hitTimeDiff: number;
+    readonly distanceDiff: number;
 }
 
 /**
@@ -35,11 +37,6 @@ export class TwoHandChecker {
      * The data of the replay.
      */
     readonly data: ReplayData;
-
-    /**
-     * A cursor data array that only contains `movementType.DOWN` and `movementType.MOVE` movement ID occurrences.
-     */
-    private readonly downMoveCursorInstances: CursorData[] = [];
 
     /**
      * The hitobjects of the beatmap that have been assigned with their respective cursor index.
@@ -76,9 +73,7 @@ export class TwoHandChecker {
      * Checks if a beatmap is two-handed.
      */
     check(): boolean {
-        this.filterCursorInstances();
-
-        if (this.downMoveCursorInstances.filter(v => v.size > 0).length <= 1) {
+        if (this.data.cursorMovement.filter(v => v.size > 0).length <= 1) {
             return false;
         }
 
@@ -86,36 +81,6 @@ export class TwoHandChecker {
         this.applyPenalty();
 
         return true;
-    }
-
-    /**
-     * Filters the original cursor instances, returning only those with `movementType.DOWN` and `movementType.MOVE` movement ID.
-     */
-    private filterCursorInstances(): void {
-        for (let i = 0; i < this.data.cursorMovement.length; ++i) {
-            const cursorInstance: CursorData = this.data.cursorMovement[i];
-            const newCursorData: CursorData = {
-                size: 0,
-                time: [],
-                x: [],
-                y: [],
-                id: []
-            };
-
-            for (let j = 0; j < cursorInstance.size; ++j) {
-                if (cursorInstance.id[j] === movementType.UP) {
-                    continue;
-                }
-
-                ++newCursorData.size;
-                newCursorData.time.push(cursorInstance.time[j]);
-                newCursorData.x.push(cursorInstance.x[j]);
-                newCursorData.y.push(cursorInstance.y[j]);
-                newCursorData.id.push(cursorInstance.id[j]);
-            }
-
-            this.downMoveCursorInstances.push(newCursorData);
-        }
     }
 
     /**
@@ -136,9 +101,13 @@ export class TwoHandChecker {
             this.indexedHitObjects.push(new IndexedHitObject(current, index));
         }
 
+        const notFound = this.indexedHitObjects.filter(v => v.cursorIndex === -1);
+
+        console.log("Spinners:", this.map.map.spinners);
+        console.log("Misses:", this.data.accuracy.nmiss);
         console.log(indexes.filter(v => v !== -1).length, "cursors found,", indexes.filter(v => v === -1).length, "not found");
 
-        const indexCounts: number[] = Utils.initializeArray(this.downMoveCursorInstances.length, 0);
+        const indexCounts: number[] = Utils.initializeArray(this.data.cursorMovement.length, 0);
         for (const index of indexes) {
             if (index === -1) {
                 continue;
@@ -160,7 +129,7 @@ export class TwoHandChecker {
             }
         });
 
-        for (let i = 0; i < this.downMoveCursorInstances.length; ++i) {
+        for (let i = 0; i < this.data.cursorMovement.length; ++i) {
             console.log("Index", i, "count:", indexes.filter(v => v === i).length);
         }
     }
@@ -171,19 +140,19 @@ export class TwoHandChecker {
     private getHitWindowOffset(): number {
         const deltaTimes: number[] = [];
 
-        for (let i = 0; i < this.downMoveCursorInstances.length; ++i) {
-            const c: CursorData = this.downMoveCursorInstances[i];
+        for (let i = 0; i < this.data.cursorMovement.length; ++i) {
+            const c: CursorData = this.data.cursorMovement[i];
 
             for (let j = 0; j < c.size; ++j) {
-                if (c.time[j] < this.map.map.objects[0].startTime - this.hitWindow.hitWindowFor50()) {
+                if (c.occurrences[j].time < this.map.map.objects[0].startTime - this.hitWindow.hitWindowFor50()) {
                     continue;
                 }
 
-                if (c.id[j] !== movementType.MOVE) {
+                if (c.occurrences[j].id !== movementType.MOVE) {
                     continue;
                 }
 
-                const deltaTime = c.time[j] - c.time[j - 1];
+                const deltaTime = c.occurrences[j].time - c.occurrences[j - 1].time;
 
                 if (deltaTime > 0) {
                     deltaTimes.push(deltaTime);
@@ -225,92 +194,245 @@ export class TwoHandChecker {
         const hitTime: number = startTime + data.accuracy;
         const minimumHitTime: number = startTime - hitWindowLength - hitWindowOffset;
         const maximumHitTime: number = startTime + hitWindowLength + hitWindowOffset;
-
         const cursorInformations: CursorInformation[] = [];
-        for (let i = 0; i < this.downMoveCursorInstances.length; ++i) {
-            const c: CursorData = this.downMoveCursorInstances[i];
 
-            let minDistance: number = Number.POSITIVE_INFINITY;
-            let minHitTime: number = 0;
+// n=15 t=18792 x=440 y=248 offset=-2
+// i=0 n=66 t=18749 x=427 y=211 move
+// i=0 n=67 t=18749 x=428 y=216 move
+// i=0 n=68 t=18774 x=431 y=252 move
+// i=0 n=69 t=18825 x=439 y=293 move
+// i=0 n=70 t=18879 x=448 y=331 move
 
-            for (let j = 0; j < c.size; ++j) {
-                if (c.time[j] < minimumHitTime) {
+        for (let i = 0; i < this.data.cursorMovement.length; ++i) {
+            const c: CursorData = this.data.cursorMovement[i];
+
+            if (c.size === 0) {
+                continue;
+            }
+
+            let hitTimeBeforeIndex: number = MathUtils.clamp(c.occurrences.findIndex(v => v.time >= minimumHitTime), 1, c.size - 1) - 1;
+            const hitTimeAfterIndex: number = MathUtils.clamp(c.occurrences.findIndex(v => v.time >= maximumHitTime), 2, c.size) - 1;
+
+            // Sometimes a `movementType.UP` instance occurs at the same time as a `movementType.MOVE`
+            // or a cursor is recorded twice in one time, therefore this check is required.
+            while (c.occurrences[hitTimeBeforeIndex]?.time === c.occurrences[hitTimeBeforeIndex - 1]?.time && hitTimeBeforeIndex > 0) {
+                --hitTimeBeforeIndex;
+            }
+
+            if (object.object.startTime === 18792) {
+                console.log();
+            }
+
+            // We track the cursor movement along those indexes.
+            // Current cursor position is in `hitTimeBeforeIndex`.
+            let distance: number = Number.POSITIVE_INFINITY;
+
+            for (let j = hitTimeBeforeIndex; j <= hitTimeAfterIndex; ++j) {
+                const occurrence: CursorOccurrence = c.occurrences[j];
+
+                if (c.occurrences[j].id === movementType.UP) {
                     continue;
                 }
 
-                // For some reason, some cursor instances repeat itself,
-                // so just skip it to save time.
-                if (c.time[j + 1] === c.time[j]) {
-                    continue;
+                const cursorPosition = new Vector2(occurrence.position);
+
+                distance = Math.min(distance, object.object.stackedPosition.getDistance(cursorPosition));
+
+                if (object.object.startTime === 18792) {
+                    console.log();
                 }
 
-                if (c.time[j - 1] > maximumHitTime) {
-                    break;
-                }
+                const nextOccurrence: CursorOccurrence = c.occurrences[j + 1];
 
-                let hitPosition: Vector2 = new Vector2({
-                    x: c.x[j],
-                    y: c.y[j]
-                });
+                if (nextOccurrence.id === movementType.MOVE && occurrence.time <= maximumHitTime && occurrence.time !== nextOccurrence.time) {
+                    // If next cursor is a `move` instance and it doesn't go out of
+                    // range, we interpolate cursor position between two occurrences.
+                    const nextPosition: Vector2 = new Vector2(nextOccurrence.position);
 
-                let distanceToObject: number = object.object.stackedPosition.getDistance(hitPosition);
-                if (minDistance > distanceToObject) {
-                    minDistance = distanceToObject;
-                    minHitTime = c.time[j];
-                }
+                    const displacement: Vector2 = nextPosition.subtract(cursorPosition);
 
-                minDistance = Math.min(minDistance, object.object.stackedPosition.getDistance(hitPosition));
+                    for (let mSecPassed = occurrence.time; mSecPassed <= Math.min(hitTime + hitWindowOffset, nextOccurrence.time); ++mSecPassed) {
+                        const progress: number = (mSecPassed - occurrence.time) / (nextOccurrence.time - occurrence.time);
 
-                if (c.id[j + 1] === movementType.MOVE || c.id[j] === movementType.MOVE) {
-                    // Interpolate cursor position between two occurrences
-                    const initialPosition: Vector2 = new Vector2({
-                        x: c.x[j],
-                        y: c.y[j]
-                    });
-
-                    const nextPosition: Vector2 = new Vector2({
-                        x: c.x[j + 1],
-                        y: c.y[j + 1]
-                    });
-
-                    const displacement: Vector2 = nextPosition.subtract(initialPosition);
-
-                    for (let mSecPassed = c.time[j]; mSecPassed <= Math.min(c.time[j + 1], maximumHitTime); ++mSecPassed) {
-                        const progress: number = (mSecPassed - c.time[j]) / (c.time[j + 1] - c.time[j]);
-
-                        hitPosition = initialPosition.add(displacement.scale(progress));
-                        distanceToObject = object.object.stackedPosition.getDistance(hitPosition);
-                        if (minDistance > distanceToObject) {
-                            minDistance = distanceToObject;
-                            minHitTime = mSecPassed;
-                        }
+                        distance = Math.min(
+                            distance,
+                            object.object.stackedPosition.getDistance(cursorPosition.add(displacement.scale(progress)))
+                        );
                     }
                 }
             }
 
-            if (minDistance <= object.radius) {
+            if (distance <= object.radius) {
                 cursorInformations.push({
                     cursorIndex: i,
-                    hitTimeDiff: Math.abs(minHitTime - hitTime)
+                    distanceDiff: distance
                 });
             }
         }
 
-        if (cursorInformations.length === 0) {
-            return -1;
-        }
+        // const isActive: boolean[] = Utils.initializeArray(this.data.cursorMovement.length, false);
+
+        // // Get the list of cursors that are active when object hit window is still active.
+        // for (let i = 0; i < this.data.cursorMovement.length; ++i) {
+        //     const c: CursorData = this.data.cursorMovement[i];
+
+        //     for (let j = 0; j < c.size; ++j) {
+        //         if (c.time[j] > maximumHitTime) {
+        //             break;
+        //         }
+
+        //         isActive[i] = c.id[j] === movementType.DOWN || c.id[j] === movementType.MOVE;
+        //     }
+        // }
+
+        // if (isActive.filter(Boolean).length === 1) {
+        //     return isActive.indexOf(true);
+        // }
+
+// t=21382 x=69, y=311
+// i=0 n=167 t=21252 x=77 y=301 press
+// i=0 n=168 t=21447 x=83 y=300 move
+// i=0 n=169 t=21476 lift
+// TODO: check the way it's checked (need to check if cursor is pressed during object hit time)
+
+        // Now we check the position of each cursor during which the object is hit.
+        // for (let i = 0; i < this.data.cursorMovement.length; ++i) {
+        //     if (!isActive[i]) {
+        //         continue;
+        //     }
+
+        //     let distance: number = Number.POSITIVE_INFINITY;
+
+        //     const c: CursorData = this.data.cursorMovement[i];
+
+        //     for (let j = 0; j < c.size; ++j) {
+        //         if (c.time[j] < minimumHitTime) {
+        //             continue;
+        //         }
+
+        //         if (c.time[j] > maximumHitTime) {
+        //             break;
+        //         }
+
+        //         if (c.id[j] === movementType.UP) {
+        //             continue;
+        //         }
+
+        //         let hitPosition: Vector2 = new Vector2({
+        //             x: c.x[j],
+        //             y: c.y[j]
+        //         });
+
+        //         distance = object.object.stackedPosition.getDistance(hitPosition);
+
+        //         if (c.id[j + 1] === movementType.MOVE) {
+        //             // Interpolate cursor position between two occurrences
+        //             const initialPosition: Vector2 = new Vector2({
+        //                 x: c.x[j],
+        //                 y: c.y[j]
+        //             });
+
+        //             const nextPosition: Vector2 = new Vector2({
+        //                 x: c.x[j + 1],
+        //                 y: c.y[j + 1]
+        //             });
+
+        //             const displacement: Vector2 = nextPosition.subtract(initialPosition);
+
+        //             for (let mSecPassed = c.time[j]; mSecPassed <= Math.min(c.time[j + 1], maximumHitTime); ++mSecPassed) {
+        //                 const progress: number = (mSecPassed - c.time[j]) / (c.time[j + 1] - c.time[j]);
+
+        //                 hitPosition = initialPosition.add(displacement.scale(progress));
+        //                 distance = object.object.stackedPosition.getDistance(hitPosition);
+        //             }
+        //         }
+        //     }
+
+        //     if (distance <= object.radius) {
+        //         cursorInformations.push({
+        //             cursorIndex: i,
+        //             distanceDiff: distance
+        //         });
+        //     }
+        // }
+        // for (let i = 0; i < this.data.cursorMovement.length; ++i) {
+        //     if (!isActive[i]) {
+        //         continue;
+        //     }
+
+        //     const c: CursorData = this.data.cursorMovement[i];
+
+        //     let minDistance: number = Number.POSITIVE_INFINITY;
+        //     let minHitTime: number = 0;
+
+        //     for (let j = 0; j < c.size; ++j) {
+        //         if (c.time[j] < minimumHitTime) {
+        //             continue;
+        //         }
+
+        //         if (c.time[j - 1] > maximumHitTime) {
+        //             break;
+        //         }
+
+        //         let hitPosition: Vector2 = new Vector2({
+        //             x: c.x[j],
+        //             y: c.y[j]
+        //         });
+
+        //         let distanceToObject: number = object.object.stackedPosition.getDistance(hitPosition);
+        //         if (minDistance > distanceToObject) {
+        //             minDistance = distanceToObject;
+        //             minHitTime = c.time[j];
+        //         }
+
+        //         minDistance = Math.min(minDistance, object.object.stackedPosition.getDistance(hitPosition));
+
+        //         if (c.id[j + 1] === movementType.MOVE || c.id[j] === movementType.MOVE) {
+        //             // Interpolate cursor position between two occurrences
+        //             const initialPosition: Vector2 = new Vector2({
+        //                 x: c.x[j],
+        //                 y: c.y[j]
+        //             });
+
+        //             const nextPosition: Vector2 = new Vector2({
+        //                 x: c.x[j + 1],
+        //                 y: c.y[j + 1]
+        //             });
+
+        //             const displacement: Vector2 = nextPosition.subtract(initialPosition);
+
+        //             for (let mSecPassed = c.time[j]; mSecPassed <= Math.min(c.time[j + 1], maximumHitTime); ++mSecPassed) {
+        //                 const progress: number = (mSecPassed - c.time[j]) / (c.time[j + 1] - c.time[j]);
+
+        //                 hitPosition = initialPosition.add(displacement.scale(progress));
+        //                 distanceToObject = object.object.stackedPosition.getDistance(hitPosition);
+        //                 if (minDistance > distanceToObject) {
+        //                     minDistance = distanceToObject;
+        //                     minHitTime = mSecPassed;
+        //                 }
+        //             }
+        //         }
+        //     }
+
+        //     if (minDistance <= object.radius) {
+        //         cursorInformations.push({
+        //             cursorIndex: i,
+        //             hitTimeDiff: Math.abs(minHitTime - hitTime)
+        //         });
+        //     }
+        // }
 
         // Cursors have been filtered to see which of them is inside the object.
-        // Now we look at which cursor is closest to hit time.
-        const minHitTimeDiff: number = Math.min(...cursorInformations.map(v => { return v.hitTimeDiff; }));
-        return cursorInformations.find(c => c.hitTimeDiff === minHitTimeDiff)!.cursorIndex;
+        // Now we look at which cursor is closest to the center of the object.
+        const minDistanceDiff: number = Math.min(...cursorInformations.map(v => { return v.distanceDiff; }));
+        return cursorInformations.find(c => c.distanceDiff === minDistanceDiff)?.cursorIndex ?? -1;
     }
 
     /**
      * Applies penalty to the original star rating instance.
      */
     private applyPenalty(): void {
-        const beatmaps: Beatmap[] = new Array(this.downMoveCursorInstances.length);
+        const beatmaps: Beatmap[] = new Array(this.data.cursorMovement.length);
 
         this.indexedHitObjects.forEach(o => {
             if (!beatmaps[o.cursorIndex]) {
