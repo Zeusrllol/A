@@ -1,4 +1,5 @@
 import { movementType } from "../../constants/movementType";
+import { CursorOccurrence } from "./CursorOccurrence";
 
 /**
  * Contains information about a cursor instance.
@@ -37,18 +38,31 @@ export interface CursorInformation {
  * 
  * This is used when analyzing replays using replay analyzer.
  */
-export class CursorData implements CursorInformation {
+export class CursorData {
+    /**
+     * The movement size of this cursor instance.
+     */
     size: number;
-    readonly time: number[];
-    readonly x: number[];
-    readonly y: number[];
-    readonly id: movementType[];
+
+    /**
+     * The occurrences of this cursor instance.
+     */
+    readonly occurrences: CursorOccurrence[];
 
     constructor(values: CursorInformation) {
         this.size = values.size;
-        this.time = values.time;
-        this.x = values.x;
-        this.y = values.y;
-        this.id = values.id;
+
+        const occurrences: CursorOccurrence[] = [];
+
+        for (let i = 0; i < this.size; ++i) {
+            occurrences.push(new CursorOccurrence(
+                values.time[i],
+                values.x[i],
+                values.y[i],
+                values.id[i]
+            ));
+        }
+
+        this.occurrences = occurrences;
     }
 }
