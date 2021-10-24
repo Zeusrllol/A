@@ -299,13 +299,34 @@ declare module "osu-droid" {
      *
      * This is used when analyzing replays using replay analyzer.
      */
-    export class CursorData implements CursorInformation {
+    export class CursorData {
+        /**
+         * The movement size of this cursor instance.
+         */
         size: number;
-        readonly time: number[];
-        readonly x: number[];
-        readonly y: number[];
-        readonly id: movementType[];
+        /**
+         * The occurrences of this cursor instance.
+         */
+        readonly occurrences: CursorOccurrence[];
         constructor(values: CursorInformation);
+    }
+
+    /**
+     * Represents a cursor's occurrence.
+     */
+    export class CursorOccurrence {
+        /**
+         * The time of this occurrence.
+         */
+        readonly time: number;
+        /**
+         * The position of the occurrence.
+         */
+        readonly position: Vector2;
+        /**
+         * The movement ID of the occurrence.
+         */
+        readonly id: movementType;
     }
 
     /**

@@ -4,6 +4,7 @@ import { BreakPoint } from './beatmap/timings/BreakPoint';
 import { Chart } from './utils/Chart';
 import { Circle } from './beatmap/hitobjects/Circle';
 import { CursorData } from './replay/data/CursorData';
+import { CursorOccurrence } from './replay/data/CursorOccurrence';
 import { DifficultyHitObject } from './difficulty/preprocessing/DifficultyHitObject';
 import { DifficultyHitObjectCreator } from './difficulty/preprocessing/DifficultyHitObjectCreator';
 import { DroidAim } from './difficulty/skills/DroidAim';
@@ -114,6 +115,11 @@ export = {
      * This is used when analyzing replays using replay analyzer.
      */
     CursorData,
+
+    /**
+     * Represents a cursor's occurrence.
+     */
+    CursorOccurrence,
 
     /**
      * Represents an osu!standard hit object with difficulty calculation values.
