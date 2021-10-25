@@ -198,13 +198,6 @@ export class TwoHandChecker {
         const maximumHitTime: number = startTime + hitWindowLength + hitWindowOffset;
         const cursorInformations: CursorInformation[] = [];
 
-// n=15 t=18792 x=440 y=248 offset=-2
-// i=0 n=66 t=18749 x=427 y=211 move
-// i=0 n=67 t=18749 x=428 y=216 move
-// i=0 n=68 t=18774 x=431 y=252 move
-// i=0 n=69 t=18825 x=439 y=293 move
-// i=0 n=70 t=18879 x=448 y=331 move
-
         for (let i = 0; i < this.data.cursorMovement.length; ++i) {
             const c: CursorData = this.data.cursorMovement[i];
 
@@ -213,15 +206,19 @@ export class TwoHandChecker {
             }
 
             let hitTimeBeforeIndex: number = MathUtils.clamp(c.occurrences.findIndex(v => v.time >= minimumHitTime), 1, c.size - 1) - 1;
-            const hitTimeAfterIndex: number = MathUtils.clamp(
-                c.occurrences.findIndex(
-                    // There is a special case for sliders where the time leniency in droid is a lot bigger compared to PC.
-                    // To prevent slider end time from ending earlier than hit window leniency, we use the maximum value between both.
-                    v => v.time >= Math.max(object.object.endTime, maximumHitTime)
-                ),
-                2,
-                c.size
-            ) - 1;
+            let hitTimeAfterIndex: number = c.occurrences.findIndex(
+                // There is a special case for sliders where the time leniency in droid is a lot bigger compared to PC.
+                // To prevent slider end time from ending earlier than hit window leniency, we use the maximum value between both.
+                v => v.time >= Math.max(object.object.endTime, maximumHitTime)
+            );
+
+            if (hitTimeAfterIndex === -1) {
+                // Maximum hit time or object end time may be out of bounds for every presses.
+                // We set the index to the latest cursor occurrence if that happens.
+                hitTimeAfterIndex = c.size;
+            }
+
+            --hitTimeAfterIndex;
 
             // Sometimes a `movementType.UP` instance occurs at the same time as a `movementType.MOVE`
             // or a cursor is recorded twice in one time, therefore this check is required.
@@ -242,7 +239,7 @@ export class TwoHandChecker {
             for (let j = hitTimeBeforeIndex; j <= hitTimeAfterIndex; ++j) {
                 const occurrence: CursorOccurrence = c.occurrences[j];
 
-                if (c.occurrences[j].id === movementType.UP) {
+                if (occurrence.id === movementType.UP) {
                     continue;
                 }
 
@@ -253,7 +250,7 @@ export class TwoHandChecker {
                 const nextOccurrence: CursorOccurrence = c.occurrences[j + 1];
 
                 if (nextOccurrence.id === movementType.MOVE && occurrence.time <= maximumHitTime && occurrence.time !== nextOccurrence.time) {
-                    // If next cursor is a `move` instance and it doesn't go out of
+                    // If next cursor is a `move` instance and it doesn't go out of time
                     // range, we interpolate cursor position between two occurrences.
                     const nextPosition: Vector2 = new Vector2(nextOccurrence.position);
 
@@ -296,12 +293,6 @@ export class TwoHandChecker {
         // if (isActive.filter(Boolean).length === 1) {
         //     return isActive.indexOf(true);
         // }
-
-// t=21382 x=69, y=311
-// i=0 n=167 t=21252 x=77 y=301 press
-// i=0 n=168 t=21447 x=83 y=300 move
-// i=0 n=169 t=21476 lift
-// TODO: check the way it's checked (need to check if cursor is pressed during object hit time)
 
         // Now we check the position of each cursor during which the object is hit.
         // for (let i = 0; i < this.data.cursorMovement.length; ++i) {
