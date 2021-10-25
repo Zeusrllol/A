@@ -54,7 +54,7 @@ export class TwoHandChecker {
      * This is used to prevent excessive penalty by splitting the beatmap into
      * those that do not worth any strain.
      */
-    private readonly minCursorIndexCount: number = 10;
+    private readonly minCursorIndexCount: number = 5;
 
     /**
      * @param map The beatmap to analyze.
@@ -152,7 +152,7 @@ export class TwoHandChecker {
                     continue;
                 }
 
-                const deltaTime = c.occurrences[j].time - c.occurrences[j - 1].time;
+                const deltaTime: number = (c.occurrences[j]?.time - c.occurrences[j - 1]?.time) || 0;
 
                 if (deltaTime > 0) {
                     deltaTimes.push(deltaTime);
@@ -249,7 +249,7 @@ export class TwoHandChecker {
 
                 const nextOccurrence: CursorOccurrence = c.occurrences[j + 1];
 
-                if (nextOccurrence.id === movementType.MOVE && occurrence.time <= maximumHitTime && occurrence.time !== nextOccurrence.time) {
+                if (nextOccurrence && nextOccurrence.id === movementType.MOVE && occurrence.time <= maximumHitTime && occurrence.time !== nextOccurrence.time) {
                     // If next cursor is a `move` instance and it doesn't go out of time
                     // range, we interpolate cursor position between two occurrences.
                     const nextPosition: Vector2 = new Vector2(nextOccurrence.position);
