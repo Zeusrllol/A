@@ -15,9 +15,9 @@ import { Beatmap } from "../../beatmap/Beatmap";
 import { Utils } from "../../utils/Utils";
 import { ModUtil } from "../../utils/ModUtil";
 import { ModPrecise } from "../../mods/ModPrecise";
-import { Circle } from "../../beatmap/hitobjects/Circle";
 import { MathUtils } from "../../mathutil/MathUtils";
 import { CursorOccurrence } from "../data/CursorOccurrence";
+import { Slider } from "../../beatmap/hitobjects/Slider";
 
 interface CursorInformation {
     readonly cursorIndex: number;
@@ -177,9 +177,11 @@ export class TwoHandChecker {
         }
 
         const isPrecise: boolean = this.data.convertedMods.some(m => m instanceof ModPrecise);
+        const isSlider: boolean = object.object instanceof Slider;
+
         // For sliders, automatically set hit window to be as lenient as possible.
         let hitWindowLength: number = this.hitWindow.hitWindowFor50(isPrecise);
-        if (object.object instanceof Circle) {
+        if (!isSlider) {
             switch (data.result) {
                 case hitResult.RESULT_300:
                     hitWindowLength = this.hitWindow.hitWindowFor300(isPrecise);
@@ -211,7 +213,15 @@ export class TwoHandChecker {
             }
 
             let hitTimeBeforeIndex: number = MathUtils.clamp(c.occurrences.findIndex(v => v.time >= minimumHitTime), 1, c.size - 1) - 1;
-            const hitTimeAfterIndex: number = MathUtils.clamp(c.occurrences.findIndex(v => v.time >= maximumHitTime), 2, c.size) - 1;
+            const hitTimeAfterIndex: number = MathUtils.clamp(
+                c.occurrences.findIndex(
+                    // There is a special case for sliders where the time leniency in droid is a lot bigger compared to PC.
+                    // To prevent slider end time from ending earlier than hit window leniency, we use the maximum value between both.
+                    v => v.time >= Math.max(object.object.endTime, maximumHitTime)
+                ),
+                2,
+                c.size
+            ) - 1;
 
             // Sometimes a `movementType.UP` instance occurs at the same time as a `movementType.MOVE`
             // or a cursor is recorded twice in one time, therefore this check is required.
@@ -219,13 +229,15 @@ export class TwoHandChecker {
                 --hitTimeBeforeIndex;
             }
 
-            if (object.object.startTime === 18792) {
-                console.log();
-            }
-
             // We track the cursor movement along those indexes.
             // Current cursor position is in `hitTimeBeforeIndex`.
             let distance: number = Number.POSITIVE_INFINITY;
+            let acceptableRadius: number = object.radius;
+
+            // Sliders have a bigger radius tolerance due to slider ball.
+            if (isSlider) {
+                acceptableRadius *= 2.4;
+            }
 
             for (let j = hitTimeBeforeIndex; j <= hitTimeAfterIndex; ++j) {
                 const occurrence: CursorOccurrence = c.occurrences[j];
@@ -237,10 +249,6 @@ export class TwoHandChecker {
                 const cursorPosition = new Vector2(occurrence.position);
 
                 distance = Math.min(distance, object.object.stackedPosition.getDistance(cursorPosition));
-
-                if (object.object.startTime === 18792) {
-                    console.log();
-                }
 
                 const nextOccurrence: CursorOccurrence = c.occurrences[j + 1];
 
@@ -262,7 +270,7 @@ export class TwoHandChecker {
                 }
             }
 
-            if (distance <= object.radius) {
+            if (distance <= acceptableRadius) {
                 cursorInformations.push({
                     cursorIndex: i,
                     distanceDiff: distance
