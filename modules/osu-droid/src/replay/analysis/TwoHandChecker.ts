@@ -249,14 +249,20 @@ export class TwoHandChecker {
 
                 const nextOccurrence: CursorOccurrence = c.occurrences[j + 1];
 
-                if (nextOccurrence && nextOccurrence.id === movementType.MOVE && occurrence.time <= maximumHitTime && occurrence.time !== nextOccurrence.time) {
+                if (
+                    nextOccurrence &&
+                    nextOccurrence.id === movementType.MOVE &&
+                    occurrence.time <= maximumHitTime &&
+                    occurrence.time !== nextOccurrence.time &&
+                    !occurrence.position.equals(nextOccurrence.position)
+                ) {
                     // If next cursor is a `move` instance and it doesn't go out of time
                     // range, we interpolate cursor position between two occurrences.
                     const nextPosition: Vector2 = new Vector2(nextOccurrence.position);
 
                     const displacement: Vector2 = nextPosition.subtract(cursorPosition);
 
-                    for (let mSecPassed = occurrence.time; mSecPassed <= Math.min(hitTime + hitWindowOffset, nextOccurrence.time); ++mSecPassed) {
+                    for (let mSecPassed = Math.max(minimumHitTime, occurrence.time); mSecPassed <= Math.min(hitTime + hitWindowOffset, nextOccurrence.time); ++mSecPassed) {
                         const progress: number = (mSecPassed - occurrence.time) / (nextOccurrence.time - occurrence.time);
 
                         distance = Math.min(
