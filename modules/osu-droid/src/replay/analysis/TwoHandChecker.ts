@@ -57,6 +57,19 @@ export class TwoHandChecker {
     private readonly minCursorIndexCount: number = 5;
 
     /**
+     * The approximated difficulty of the current object such that the object is likely to be 2-handed by a player.
+     * 
+     * This scales with an object's angle and speed relative to the previous object.
+     * Acute angles or fast speed will accumulate this number. Conversely, wide angles or slow speed will decay this number.
+     */
+    private readonly currentAngleDiffApproxDefault: number = 10;
+
+    /**
+     * The threshold at which objects will be started getting considered to be 2-handable.
+     */
+    private readonly currentAngleDiffApproxThreshold: number = 200;
+
+    /**
      * @param map The beatmap to analyze.
      * @param data The data of the replay.
      */
@@ -123,8 +136,22 @@ export class TwoHandChecker {
             }
         }
 
-        this.indexedHitObjects.forEach(indexedHitObject => {
-            if (indexedHitObject.cursorIndex === -1 || ignoredCursorIndexes.includes(indexedHitObject.cursorIndex)) {
+        let overallDiffApprox: number = this.currentAngleDiffApproxDefault;
+
+        this.indexedHitObjects.forEach((indexedHitObject, i) => {
+            const diff: number = i > 0 ? this.getSpacingAngleDiffApprox(i) : 1;
+
+            overallDiffApprox = MathUtils.clamp(
+                overallDiffApprox * diff,
+                this.currentAngleDiffApproxDefault,
+                this.currentAngleDiffApproxThreshold + 100
+            );
+
+            if (
+                indexedHitObject.cursorIndex === -1 ||
+                ignoredCursorIndexes.includes(indexedHitObject.cursorIndex) ||
+                overallDiffApprox < this.currentAngleDiffApproxThreshold
+            ) {
                 indexedHitObject.cursorIndex = mainCursorIndex;
             }
         });
@@ -132,6 +159,25 @@ export class TwoHandChecker {
         for (let i = 0; i < this.data.cursorMovement.length; ++i) {
             console.log("Index", i, "count:", indexes.filter(v => v === i).length);
         }
+    }
+
+    /**
+     * Gets the approximation of an object's difficulty such that the object is likely to be 2-handed.
+     * 
+     * @param index The index of the object.
+     */
+    private getSpacingAngleDiffApprox(index: number): number {
+        const object: DifficultyHitObject = this.map.objects[index];
+
+        if (object.object instanceof Spinner) {
+            return 0.1;
+        }
+
+        const angleDiff: number = object.angle !== null ? 0.5 + Math.pow(Math.cos(object.angle / 2), 2) : 1;
+
+        const speedDiff: number = object.jumpDistance / Math.max(1, object.deltaTime);
+
+        return angleDiff * speedDiff;
     }
 
     /**
@@ -239,13 +285,22 @@ export class TwoHandChecker {
             for (let j = hitTimeBeforeIndex; j <= hitTimeAfterIndex; ++j) {
                 const occurrence: CursorOccurrence = c.occurrences[j];
 
+                const cursorPosition = new Vector2(occurrence.position);
+
+                if (occurrence.time > hitTime + hitWindowOffset + 10) {
+                    // Give an additional 10ms in case registration in-game is late.
+                    // Set distance to minimum just for the last.
+                    if (occurrence.id !== movementType.UP) {
+                        distance = Math.min(distance, object.object.stackedPosition.getDistance(cursorPosition));
+                    }
+                    break;
+                }
+
                 if (occurrence.id === movementType.UP) {
                     continue;
                 }
 
-                const cursorPosition = new Vector2(occurrence.position);
-
-                distance = Math.min(distance, object.object.stackedPosition.getDistance(cursorPosition));
+                distance = object.object.stackedPosition.getDistance(cursorPosition);
 
                 const nextOccurrence: CursorOccurrence = c.occurrences[j + 1];
 
@@ -265,10 +320,7 @@ export class TwoHandChecker {
                     for (let mSecPassed = Math.max(minimumHitTime, occurrence.time); mSecPassed <= Math.min(hitTime + hitWindowOffset, nextOccurrence.time); ++mSecPassed) {
                         const progress: number = (mSecPassed - occurrence.time) / (nextOccurrence.time - occurrence.time);
 
-                        distance = Math.min(
-                            distance,
-                            object.object.stackedPosition.getDistance(cursorPosition.add(displacement.scale(progress)))
-                        );
+                        distance = object.object.stackedPosition.getDistance(cursorPosition.add(displacement.scale(progress)));
                     }
                 }
             }
