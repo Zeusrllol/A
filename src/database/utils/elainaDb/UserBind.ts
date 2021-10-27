@@ -5,7 +5,7 @@ import { DatabaseUserBind } from "@alice-interfaces/database/elainaDb/DatabaseUs
 import { PPEntry } from "@alice-interfaces/dpp/PPEntry";
 import { PrototypePPEntry } from "@alice-interfaces/dpp/PrototypePPEntry";
 import { RecalculationProgress } from "@alice-interfaces/dpp/RecalculationProgress";
-import { PerformanceCalculationResult } from "@alice-interfaces/utils/PerformanceCalculationResult";
+import { PerformanceCalculationResult } from "@alice-utils/dpp/PerformanceCalculationResult";
 import { Manager } from "@alice-utils/base/Manager";
 import { ArrayHelper } from "@alice-utils/helpers/ArrayHelper";
 import { BeatmapDifficultyHelper } from "@alice-utils/helpers/BeatmapDifficultyHelper";
@@ -17,8 +17,9 @@ import { WhitelistManager } from "@alice-utils/managers/WhitelistManager";
 import { ObjectId } from "bson";
 import { Collection, Snowflake } from "discord.js";
 import { UpdateQuery } from "mongodb";
-import { DroidAPIRequestBuilder, MapInfo, Player, RequestResponse, Score } from "osu-droid";
+import { DroidAPIRequestBuilder, MapInfo, Player, Precision, RequestResponse, Score } from "osu-droid";
 import { Clan } from "./Clan";
+import { StringHelper } from "@alice-utils/helpers/StringHelper";
 
 /**
  * Represents a Discord user who has at least one osu!droid account binded.
@@ -245,7 +246,15 @@ export class UserBind extends Manager {
         for await (const ppEntry of this.pp.values()) {
             const score: Score | null = await this.getScoreFromPlayer(ppEntry.hash);
 
-            if (!score) {
+            // Check for score equality.
+            if (
+                !score ||
+                score.scoreID !== ppEntry.scoreID ||
+                score.combo !== ppEntry.combo ||
+                !Precision.almostEqualsNumber(score.accuracy.value() * 100, ppEntry.accuracy) ||
+                score.accuracy.nmiss !== ppEntry.miss ||
+                StringHelper.sortAlphabet(score.mods.map(v => v.acronym).join("")) !== StringHelper.sortAlphabet(ppEntry.mods)
+            ) {
                 continue;
             }
 
@@ -292,7 +301,15 @@ export class UserBind extends Manager {
         for await (const ppEntry of this.pp.values()) {
             const score: Score | null = await this.getScoreFromPlayer(ppEntry.hash);
 
-            if (!score) {
+            // Check for score equality.
+            if (
+                !score ||
+                score.scoreID !== ppEntry.scoreID ||
+                score.combo !== ppEntry.combo ||
+                !Precision.almostEqualsNumber(score.accuracy.value() * 100, ppEntry.accuracy) ||
+                score.accuracy.nmiss !== ppEntry.miss ||
+                StringHelper.sortAlphabet(score.mods.map(v => v.acronym).join("")) !== StringHelper.sortAlphabet(ppEntry.mods)
+            ) {
                 continue;
             }
 
@@ -380,6 +397,10 @@ export class UserBind extends Manager {
         };
 
         for await (const uid of this.previous_bind) {
+            if (await DatabaseManager.elainaDb.collections.dppBan.isPlayerBanned(uid)) {
+                continue;
+            }
+
             if (isDPPRecalc && this.calculationInfo && uid !== this.calculationInfo.uid) {
                 continue;
             }
@@ -395,7 +416,7 @@ export class UserBind extends Manager {
             if (isDPPRecalc && this.calculationInfo) {
                 page = this.calculationInfo.page - 1;
 
-                newList.concat(new Collection(this.calculationInfo.currentPPEntries.map(v => [v.hash, v])));
+                newList.concat(new Collection(this.calculationInfo.currentPPEntries.map(v => [ v.hash, v ])));
             } else {
                 // Do manual operations to reduce memory usage (we don't need to cache
                 // submitted scores)

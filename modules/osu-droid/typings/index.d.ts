@@ -812,7 +812,7 @@ declare module "osu-droid" {
         /**
          * The full title of the beatmap, which is `Artist - Title (Creator) [Difficulty Name]`.
          */
-        fullTitle: string;
+        get fullTitle(): string;
         /**
          * The artist of the song of the beatmap.
          */
