@@ -177,10 +177,8 @@ export class TwoHandChecker {
 
         const speedDiff: number = object.jumpDistance / Math.max(1, object.deltaTime);
 
-        const final: number = angleDiff * speedDiff;
-
         // Make decay slower.
-        return Math.max(0.75, final);
+        return Math.max(0.8, angleDiff * speedDiff);
     }
 
     /**
