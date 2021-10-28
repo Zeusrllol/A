@@ -69,6 +69,8 @@ export class TwoHandChecker {
      */
     private readonly currentAngleDiffApproxThreshold: number = 200;
 
+    private assignCurrentIndexToOne: boolean = false;
+
     /**
      * @param map The beatmap to analyze.
      * @param data The data of the replay.
@@ -100,18 +102,24 @@ export class TwoHandChecker {
      * Converts hitobjects into indexed hit objects.
      */
     private indexHitObjects(): void {
-        const objects: DifficultyHitObject[] = this.map.objects;
-        const objectData: ReplayObjectData[] = this.data.hitObjectData;
         const hitWindowOffset: number = this.getHitWindowOffset();
         const indexes: number[] = [];
 
+        let overallDiffApprox: number = this.currentAngleDiffApproxDefault;
+
         for (let i = 0; i < this.map.objects.length; ++i) {
-            const current: DifficultyHitObject = objects[i];
-            const currentData: ReplayObjectData = objectData[i];
-            const index: number = this.getCursorIndex(current, currentData, hitWindowOffset);
+            const diff: number = i > 0 ? this.getSpacingAngleDiffApprox(i) : 1;
+
+            overallDiffApprox = MathUtils.clamp(
+                overallDiffApprox * diff,
+                this.currentAngleDiffApproxDefault,
+                this.currentAngleDiffApproxThreshold + 100
+            );
+
+            const index: number = overallDiffApprox >= this.currentAngleDiffApproxThreshold ? this.getCursorIndex(i, hitWindowOffset) : 0;
 
             indexes.push(index);
-            this.indexedHitObjects.push(new IndexedHitObject(current, index));
+            this.indexedHitObjects.push(new IndexedHitObject(this.map.objects[i], index));
         }
 
         const notFound = this.indexedHitObjects.filter(v => v.cursorIndex === -1);
@@ -136,22 +144,8 @@ export class TwoHandChecker {
             }
         }
 
-        let overallDiffApprox: number = this.currentAngleDiffApproxDefault;
-
         this.indexedHitObjects.forEach((indexedHitObject, i) => {
-            const diff: number = i > 0 ? this.getSpacingAngleDiffApprox(i) : 1;
-
-            overallDiffApprox = MathUtils.clamp(
-                overallDiffApprox * diff,
-                this.currentAngleDiffApproxDefault,
-                this.currentAngleDiffApproxThreshold + 100
-            );
-
-            if (
-                indexedHitObject.cursorIndex === -1 ||
-                ignoredCursorIndexes.includes(indexedHitObject.cursorIndex) ||
-                overallDiffApprox < this.currentAngleDiffApproxThreshold
-            ) {
+            if (indexedHitObject.cursorIndex === -1 || ignoredCursorIndexes.includes(indexedHitObject.cursorIndex)) {
                 indexedHitObject.cursorIndex = mainCursorIndex;
             }
         });
@@ -213,12 +207,14 @@ export class TwoHandChecker {
     /**
      * Gets the cursor index that hits the given object.
      * 
-     * @param object The object to check.
-     * @param data The replay data of the object.
+     * @param index The index of the object to check.
      * @param hitWindowOffset The offset for hit window to compensate for replay hit inaccuracies.
      * @returns The cursor index that hits the given object, -1 if the index is not found, the object is a spinner, or the object was missed.
      */
-    private getCursorIndex(object: DifficultyHitObject, data: ReplayObjectData, hitWindowOffset: number): number {
+    private getCursorIndex(index: number, hitWindowOffset: number): number {
+        const object: DifficultyHitObject = this.map.objects[index];
+        const data: ReplayObjectData = this.data.hitObjectData[index];
+
         if (object.object instanceof Spinner || data.result === hitResult.RESULT_0) {
             return -1;
         }
@@ -283,8 +279,11 @@ export class TwoHandChecker {
                 acceptableRadius *= 2.4;
             }
 
-            for (let j = hitTimeBeforeIndex; j <= hitTimeAfterIndex; ++j) {
+            let j: number = hitTimeBeforeIndex;
+
+            for (j; j <= hitTimeAfterIndex; ++j) {
                 const occurrence: CursorOccurrence = c.occurrences[j];
+                const nextOccurrence: CursorOccurrence = c.occurrences[j + 1];
 
                 const cursorPosition = new Vector2(occurrence.position);
 
@@ -302,8 +301,6 @@ export class TwoHandChecker {
                 }
 
                 distance = object.object.stackedPosition.getDistance(cursorPosition);
-
-                const nextOccurrence: CursorOccurrence = c.occurrences[j + 1];
 
                 if (
                     nextOccurrence &&
@@ -326,12 +323,50 @@ export class TwoHandChecker {
                 }
             }
 
-            if (distance <= acceptableRadius) {
-                cursorInformations.push({
-                    cursorIndex: i,
-                    distanceDiff: distance
-                });
+            if (distance > acceptableRadius) {
+                continue;
             }
+
+            let acceptedCursorIndex: number = i;
+
+            if (isSlider) {
+                this.assignCurrentIndexToOne = acceptedCursorIndex % 2 === 0;
+            } else if (this.map.objects[index + 1]) {
+                const next: DifficultyHitObject = this.map.objects[index + 1];
+
+                // Get the latest down instance.
+                while (c.occurrences[j]?.id !== movementType.DOWN && j > hitTimeBeforeIndex) {
+                    --j;
+                }
+
+                if (c.occurrences[j].id === movementType.DOWN) {
+                    this.assignCurrentIndexToOne = !this.assignCurrentIndexToOne;
+
+                    // Special case where a cursor is "dragged" into the next object.
+                    if (c.occurrences[j + 1]?.id === movementType.UP) {
+                        acceptedCursorIndex = this.assignCurrentIndexToOne ? 1 : 0;
+                    } else if (c.occurrences[j + 1]?.id === movementType.MOVE && c.occurrences[j + 2]?.id === movementType.UP) {
+                        const vecToNext: Vector2 = next.object.stackedPosition.subtract(object.object.endPosition);
+                        const movementVec: Vector2 = c.occurrences[j + 1].position.subtract(object.object.endPosition);
+
+                        const dot: number = vecToNext.dot(movementVec);
+                        const det: number = vecToNext.x * movementVec.y - vecToNext.y * movementVec.x;
+
+                        const angle: number = Math.abs(Math.atan2(det, dot));
+
+                        if (angle < Math.PI / 6) {
+                            acceptedCursorIndex = this.assignCurrentIndexToOne ? 0 : 1;
+                        } else {
+                            acceptedCursorIndex = this.assignCurrentIndexToOne ? 1 : 0;
+                        }
+                    }
+                }
+            }
+
+            cursorInformations.push({
+                cursorIndex: acceptedCursorIndex,
+                distanceDiff: distance
+            });
         }
 
         // const isActive: boolean[] = Utils.initializeArray(this.data.cursorMovement.length, false);
