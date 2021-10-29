@@ -305,7 +305,6 @@ export class TwoHandChecker {
                 if (
                     nextOccurrence &&
                     nextOccurrence.id === movementType.MOVE &&
-                    occurrence.time <= maximumHitTime &&
                     occurrence.time !== nextOccurrence.time &&
                     !occurrence.position.equals(nextOccurrence.position)
                 ) {
@@ -340,10 +339,9 @@ export class TwoHandChecker {
                 }
 
                 if (c.occurrences[j].id === movementType.DOWN) {
-                    this.assignCurrentIndexToOne = !this.assignCurrentIndexToOne;
-
                     // Special case where a cursor is "dragged" into the next object.
                     if (c.occurrences[j + 1]?.id === movementType.UP) {
+                        this.assignCurrentIndexToOne = !this.assignCurrentIndexToOne;
                         acceptedCursorIndex = this.assignCurrentIndexToOne ? 1 : 0;
                     } else if (c.occurrences[j + 1]?.id === movementType.MOVE && c.occurrences[j + 2]?.id === movementType.UP) {
                         const vecToNext: Vector2 = next.object.stackedPosition.subtract(object.object.endPosition);
@@ -355,8 +353,9 @@ export class TwoHandChecker {
                         const angle: number = Math.abs(Math.atan2(det, dot));
 
                         if (angle < Math.PI / 6) {
-                            acceptedCursorIndex = this.assignCurrentIndexToOne ? 0 : 1;
+                            acceptedCursorIndex = 0;
                         } else {
+                            this.assignCurrentIndexToOne = !this.assignCurrentIndexToOne;
                             acceptedCursorIndex = this.assignCurrentIndexToOne ? 1 : 0;
                         }
                     }
