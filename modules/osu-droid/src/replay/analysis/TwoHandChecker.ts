@@ -344,6 +344,9 @@ export class TwoHandChecker {
                         this.assignCurrentIndexToOne = !this.assignCurrentIndexToOne;
                         acceptedCursorIndex = this.assignCurrentIndexToOne ? 1 : 0;
                     } else if (c.occurrences[j + 1]?.id === movementType.MOVE && c.occurrences[j + 2]?.id === movementType.UP) {
+                        // Some move instances move in the exact same place. Not sure why, most likely
+                        // because the position is recorded as int in the game and the movement is too small to
+                        // convert into +1 or -1.
                         const vecToNext: Vector2 = next.object.stackedPosition.subtract(object.object.endPosition);
                         const movementVec: Vector2 = c.occurrences[j + 1].position.subtract(object.object.endPosition);
 
