@@ -144,7 +144,7 @@ export class TwoHandChecker {
             }
         }
 
-        this.indexedHitObjects.forEach((indexedHitObject, i) => {
+        this.indexedHitObjects.forEach(indexedHitObject => {
             if (indexedHitObject.cursorIndex === -1 || ignoredCursorIndexes.includes(indexedHitObject.cursorIndex)) {
                 indexedHitObject.cursorIndex = mainCursorIndex;
             }
@@ -330,37 +330,67 @@ export class TwoHandChecker {
 
             if (isSlider) {
                 this.assignCurrentIndexToOne = acceptedCursorIndex % 2 === 0;
-            } else if (this.map.objects[index + 1]) {
-                const next: DifficultyHitObject = this.map.objects[index + 1];
-
+            } else {
                 // Get the latest down instance.
                 while (c.occurrences[j]?.id !== movementType.DOWN && j > hitTimeBeforeIndex) {
                     --j;
                 }
 
                 if (c.occurrences[j].id === movementType.DOWN) {
+                    let isAngleFulfilled: boolean = false;
+
                     // Special case where a cursor is "dragged" into the next object.
                     if (c.occurrences[j + 1]?.id === movementType.UP) {
+                        // Set angle fulfilled to true so that no other checks will run.
+                        isAngleFulfilled = true;
                         this.assignCurrentIndexToOne = !this.assignCurrentIndexToOne;
                         acceptedCursorIndex = this.assignCurrentIndexToOne ? 1 : 0;
-                    } else if (c.occurrences[j + 1]?.id === movementType.MOVE && c.occurrences[j + 2]?.id === movementType.UP) {
-                        // Some move instances move in the exact same place. Not sure why, most likely
-                        // because the position is recorded as int in the game and the movement is too small to
-                        // convert into +1 or -1.
-                        const vecToNext: Vector2 = next.object.stackedPosition.subtract(object.object.endPosition);
+                    }
+
+                    if (
+                        !isAngleFulfilled &&
+                        c.occurrences[j + 1]?.id === movementType.MOVE &&
+                        c.occurrences[j + 2]?.id === movementType.UP &&
+                        !c.occurrences[j].position.equals(c.occurrences[j + 1].position)
+                    ) {
                         const movementVec: Vector2 = c.occurrences[j + 1].position.subtract(object.object.endPosition);
 
-                        const dot: number = vecToNext.dot(movementVec);
-                        const det: number = vecToNext.x * movementVec.y - vecToNext.y * movementVec.x;
+                        if (this.map.objects[index + 1]) {
+                            const next: DifficultyHitObject = this.map.objects[index + 1];
 
-                        const angle: number = Math.abs(Math.atan2(det, dot));
+                            // Some move instances move in the exact same place. Not sure why, most likely
+                            // because the position is recorded as int in the game and the movement is too small to
+                            // convert into +1 or -1.
+                            const currentToNext: Vector2 = next.object.stackedPosition.subtract(object.object.endPosition);
 
-                        if (angle < Math.PI / 6) {
-                            acceptedCursorIndex = 0;
-                        } else {
-                            this.assignCurrentIndexToOne = !this.assignCurrentIndexToOne;
-                            acceptedCursorIndex = this.assignCurrentIndexToOne ? 1 : 0;
+                            const dot: number = currentToNext.dot(movementVec);
+                            const det: number = currentToNext.x * movementVec.y - currentToNext.y * movementVec.x;
+
+                            const movementToNextAngle: number = Math.abs(Math.atan2(det, dot));
+
+                            isAngleFulfilled = movementToNextAngle < Math.PI / 6;
                         }
+
+                        if (this.map.objects[index - 1] && !isAngleFulfilled) {
+                            const prev: DifficultyHitObject = this.map.objects[index - 1];
+
+                            const extendedCurrent: Vector2 = object.object.endPosition.scale(1.5);
+
+                            const dot: number = extendedCurrent.dot(movementVec);
+                            const det: number = extendedCurrent.x * movementVec.y - extendedCurrent.y * movementVec.x;
+
+                            const extendedCurrentToMovementAngle: number = Math.abs(Math.atan2(det, dot));
+
+                            isAngleFulfilled = extendedCurrentToMovementAngle < Math.PI / 6;
+                        }
+                    }
+
+                    if (isAngleFulfilled) {
+                        this.assignCurrentIndexToOne = true;
+                        acceptedCursorIndex = 0;
+                    } else {
+                        this.assignCurrentIndexToOne = !this.assignCurrentIndexToOne;
+                        acceptedCursorIndex = this.assignCurrentIndexToOne ? 1 : 0;
                     }
                 }
             }
