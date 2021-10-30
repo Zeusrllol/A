@@ -122,7 +122,7 @@ export class TwoHandChecker {
             this.indexedHitObjects.push(new IndexedHitObject(this.map.objects[i], index));
         }
 
-        const notFound = this.indexedHitObjects.filter(v => v.cursorIndex === -1);
+        // const notFound = this.indexedHitObjects.filter(v => v.cursorIndex === -1);
 
         console.log("Spinners:", this.map.map.spinners);
         console.log("Misses:", this.data.accuracy.nmiss);
@@ -339,18 +339,13 @@ export class TwoHandChecker {
                 if (c.occurrences[j].id === movementType.DOWN) {
                     let isAngleFulfilled: boolean = false;
 
-                    if (c.occurrences[j + 1]?.id === movementType.UP) {
-                        // Set angle fulfilled to true so that no other checks will run.
-                        isAngleFulfilled = true;
-                        this.assignCurrentIndexToOne = !this.assignCurrentIndexToOne;
-                        acceptedCursorIndex = this.assignCurrentIndexToOne ? 1 : 0;
-                    }
-
                     // Special case where a cursor is "dragged" into the next object.
                     if (
-                        !isAngleFulfilled &&
                         c.occurrences[j + 1]?.id === movementType.MOVE &&
                         c.occurrences[j + 2]?.id === movementType.UP &&
+                        // Some move instances move in the exact same place. Not sure why, most likely
+                        // because the position is recorded as int in the game and the movement is too small to
+                        // convert into +1 or -1.
                         !c.occurrences[j].position.equals(c.occurrences[j + 1].position)
                     ) {
                         const movementVec: Vector2 = c.occurrences[j + 1].position.subtract(object.object.endPosition);
@@ -358,9 +353,6 @@ export class TwoHandChecker {
                         if (this.map.objects[index + 1]) {
                             const next: DifficultyHitObject = this.map.objects[index + 1];
 
-                            // Some move instances move in the exact same place. Not sure why, most likely
-                            // because the position is recorded as int in the game and the movement is too small to
-                            // convert into +1 or -1.
                             const currentToNext: Vector2 = next.object.stackedPosition.subtract(object.object.endPosition);
 
                             const dot: number = currentToNext.dot(movementVec);
