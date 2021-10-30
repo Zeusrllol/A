@@ -1,6 +1,6 @@
-import { GuildMember, MessageEmbed, Permissions, TextChannel, User } from "discord.js";
+import { GuildMember, MessageEmbed, Permissions, TextChannel } from "discord.js";
 import { Config } from "@alice-core/Config";
-import { CommandArgumentType } from "@alice-enums/core/CommandArgumentType";
+import { ApplicationCommandOptionTypes } from "discord.js/typings/enums";
 import { CommandCategory } from "@alice-enums/core/CommandCategory";
 import { Command } from "@alice-interfaces/core/Command";
 import { Constants } from "@alice-core/Constants";
@@ -9,7 +9,7 @@ import { MessageCreator } from "@alice-utils/creators/MessageCreator";
 import { reportStrings } from "./reportStrings";
 
 export const run: Command["run"] = async (_, interaction) => {
-    if (!interaction.inGuild() || interaction.guildId !== Constants.mainServer) {
+    if (!interaction.inCachedGuild() || interaction.guildId !== Constants.mainServer) {
         return interaction.editReply({
             content: MessageCreator.createReject(Constants.notAvailableInServerReject)
         });
@@ -38,7 +38,7 @@ export const run: Command["run"] = async (_, interaction) => {
     const reason: string = interaction.options.getString("reason")!;
 
     const embed: MessageEmbed = EmbedCreator.createNormalEmbed(
-        { author: interaction.user, color: (<GuildMember> interaction.member).displayColor, timestamp: true }
+        { author: interaction.user, color: interaction.member.displayColor, timestamp: true }
     );
 
     embed.setThumbnail(toReport.user.avatarURL({ dynamic: true })!)
@@ -83,13 +83,13 @@ export const config: Command["config"] = {
         {
             name: "user",
             required: true,
-            type: CommandArgumentType.USER,
+            type: ApplicationCommandOptionTypes.USER,
             description: "The user to report."
         },
         {
             name: "reason",
             required: true,
-            type: CommandArgumentType.STRING,
+            type: ApplicationCommandOptionTypes.STRING,
             description: "The reason for reporting. Maximum length is 1500 characters."
         }
     ],

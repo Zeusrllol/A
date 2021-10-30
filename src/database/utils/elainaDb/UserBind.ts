@@ -398,7 +398,7 @@ export class UserBind extends Manager {
             let page = 0;
 
             if (isDPPRecalc && this.calculationInfo) {
-                page = this.calculationInfo.page - 1;
+                page = this.calculationInfo.page;
 
                 newList.concat(new Collection(this.calculationInfo.currentPPEntries.map(v => [ v.hash, v ])));
             } else {
@@ -429,7 +429,7 @@ export class UserBind extends Manager {
                 while (score = scores.shift()) {
                     const beatmapInfo: MapInfo | null = await BeatmapManager.getBeatmap(score.hash, false).catch(() => null);
 
-                    await HelperFunctions.sleep(0.1);
+                    await HelperFunctions.sleep(0.25);
 
                     if (isDPPRecalc) {
                         this.client.logger.info(`${++calculatedCount}/${scoreCount} scores calculated`);

@@ -135,7 +135,6 @@ export const run: EventUtil["run"] = async (client, interaction: Interaction) =>
 
     if (interaction.inGuild()) {
         await client.guilds.fetch(interaction.guildId);
-        await interaction.guild?.fetch();
         await (<GuildMember> interaction.member).fetch();
     }
 
