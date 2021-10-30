@@ -339,7 +339,6 @@ export class TwoHandChecker {
                 if (c.occurrences[j].id === movementType.DOWN) {
                     let isAngleFulfilled: boolean = false;
 
-                    // Special case where a cursor is "dragged" into the next object.
                     if (c.occurrences[j + 1]?.id === movementType.UP) {
                         // Set angle fulfilled to true so that no other checks will run.
                         isAngleFulfilled = true;
@@ -347,6 +346,7 @@ export class TwoHandChecker {
                         acceptedCursorIndex = this.assignCurrentIndexToOne ? 1 : 0;
                     }
 
+                    // Special case where a cursor is "dragged" into the next object.
                     if (
                         !isAngleFulfilled &&
                         c.occurrences[j + 1]?.id === movementType.MOVE &&
@@ -374,7 +374,10 @@ export class TwoHandChecker {
                         if (this.map.objects[index - 1] && !isAngleFulfilled) {
                             const prev: DifficultyHitObject = this.map.objects[index - 1];
 
-                            const extendedCurrent: Vector2 = object.object.endPosition.scale(1.5);
+                            const extendedCurrent: Vector2 = object.object.endPosition
+                                .subtract(prev.object.stackedPosition)
+                                .scale(1.5)
+                                .subtract(object.object.endPosition);
 
                             const dot: number = extendedCurrent.dot(movementVec);
                             const det: number = extendedCurrent.x * movementVec.y - extendedCurrent.y * movementVec.x;
