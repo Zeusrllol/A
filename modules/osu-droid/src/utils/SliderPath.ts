@@ -147,6 +147,12 @@ export class SliderPath {
         }
 
         if (calculatedLength !== this.expectedDistance) {
+            // In osu-stable, if the last two control points of a slider are equal, extension is not performed.
+            if (this.controlPoints.length >= 2 && this.controlPoints.at(-1)!.equals(this.controlPoints.at(-2)!) && this.expectedDistance > calculatedLength) {
+                this.cumulativeLength.push(calculatedLength);
+                return;
+            }
+
             // The last length is always incorrect
             this.cumulativeLength.pop();
             let pathEndIndex: number = this.calculatedPath.length - 1;
